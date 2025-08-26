@@ -245,13 +245,16 @@ impl<'a> CommitBuilder<'a, Initial, &mut MlsGroup> {
 
     /// Adds a GroupContextExtensions proposal for the provided [`Extensions`] to the list of
     /// proposals to be committed.
-    pub fn propose_group_context_extensions(mut self, extensions: Extensions) -> Self {
+    pub fn propose_group_context_extensions(
+        mut self,
+        extensions: Extensions<Extension>,
+    ) -> Result<Self, CreateCommitError> {
+        let group_extensions = extensions.try_into()?;
+        let proposal = GroupContextExtensionProposal::new(group_extensions);
         self.stage
             .own_proposals
-            .push(Proposal::group_context_extensions(
-                GroupContextExtensionProposal::new(extensions),
-            ));
-        self
+            .push(Proposal::group_context_extensions(proposal));
+        Ok(self)
     }
 
     /// Adds a proposal to the proposals to be committed. To add multiple
@@ -638,11 +641,16 @@ impl<'a, G: BorrowMut<MlsGroup>> CommitBuilder<'a, LoadedPsks, G> {
             (None, None)
         } else {
             // Create the ratchet tree extension if necessary
-            let mut extensions = Extensions::empty();
-            if group.configuration().use_ratchet_tree_extension {
-                extensions.add(Extension::RatchetTree(RatchetTreeExtension::new(
-                    diff.export_ratchet_tree(),
-                )))?;
+            let extensions: Extensions<Extension> = if group
+                .configuration()
+                .use_ratchet_tree_extension
+            {
+                Extensions::from_vec(vec![
+                    Extension::RatchetTree(RatchetTreeExtension::new(diff.export_ratchet_tree())),
+                    external_pub_extension,
+                ])?
+            } else {
+                Extensions::single(external_pub_extension)
             };
 
             let welcome_option = needs_welcome

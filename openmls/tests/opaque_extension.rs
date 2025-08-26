@@ -117,7 +117,8 @@ fn opaque_extension() {
             ])
             .unwrap(),
         )
-        .load_psks(alice_provider.storage())
+        .unwrap()
+        .load_psks(provider.storage())
         .expect("error loading psks")
         .build(
             alice_provider.rand(),
@@ -179,7 +180,8 @@ fn opaque_extension() {
             ])
             .unwrap(),
         )
-        .load_psks(alice_provider.storage())
+        .unwrap()
+        .load_psks(provider.storage())
         .expect("error loading psks")
         .build(
             alice_provider.rand(),
@@ -230,7 +232,7 @@ fn opaque_extension() {
 fn generate_key_package(
     ciphersuite: Ciphersuite,
     credential_with_key: CredentialWithKey,
-    extensions: Extensions,
+    extensions: Extensions<Extension>,
     provider: &impl crate::storage::OpenMlsProvider,
     signer: &impl Signer,
 ) -> KeyPackageBundle {
