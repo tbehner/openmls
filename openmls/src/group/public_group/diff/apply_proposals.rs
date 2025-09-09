@@ -19,7 +19,7 @@ pub(crate) struct ApplyProposalsValues {
     pub(crate) invitation_list: Vec<(LeafNodeIndex, AddProposal)>,
     pub(crate) presharedkeys: Vec<PreSharedKeyId>,
     pub(crate) external_init_proposal_option: Option<ExternalInitProposal>,
-    pub(crate) extensions: Option<Extensions<GroupContextExtension>>,
+    pub(crate) extensions: Option<Extensions>,
 }
 
 impl ApplyProposalsValues {
@@ -167,7 +167,8 @@ impl PublicGroupDiff<'_> {
                     Some(extensions.extensions().clone())
                 }
                 _ => None,
-            });
+            })
+            .map(|extensions| extensions.into());
 
         let proposals_require_path = proposal_queue
             .queued_proposals()

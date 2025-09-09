@@ -153,7 +153,7 @@ struct KeyPackageTbs {
     ciphersuite: Ciphersuite,
     init_key: InitKey,
     leaf_node: LeafNode,
-    extensions: Extensions<Extension>,
+    extensions: Extensions,
 }
 
 impl Signable for KeyPackageTbs {
@@ -287,9 +287,9 @@ impl KeyPackage {
         signer: &impl Signer,
         credential_with_key: CredentialWithKey,
         lifetime: Lifetime,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
         leaf_node_capabilities: Capabilities,
-        leaf_node_extensions: Extensions<Extension>,
+        leaf_node_extensions: Extensions,
     ) -> Result<KeyPackageCreationResult, KeyPackageNewError> {
         if ciphersuite.signature_algorithm() != signer.signature_scheme() {
             return Err(KeyPackageNewError::CiphersuiteSignatureSchemeMismatch);
@@ -339,9 +339,9 @@ impl KeyPackage {
         signer: &impl Signer,
         credential_with_key: CredentialWithKey,
         lifetime: Lifetime,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
         capabilities: Capabilities,
-        leaf_node_extensions: Extensions<Extension>,
+        leaf_node_extensions: Extensions,
         init_key: InitKey,
     ) -> Result<(Self, EncryptionKeyPair), KeyPackageNewError> {
         // We don't need the private key here. It's stored in the key store for
@@ -373,7 +373,7 @@ impl KeyPackage {
     }
 
     /// Get a reference to the extensions of this key package.
-    pub fn extensions(&self) -> &Extensions<Extension> {
+    pub fn extensions(&self) -> &Extensions {
         &self.payload.extensions
     }
 
@@ -447,9 +447,9 @@ impl KeyPackage {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct KeyPackageBuilder {
     key_package_lifetime: Option<Lifetime>,
-    key_package_extensions: Option<Extensions<Extension>>,
+    key_package_extensions: Option<Extensions>,
     leaf_node_capabilities: Option<Capabilities>,
-    leaf_node_extensions: Option<Extensions<Extension>>,
+    leaf_node_extensions: Option<Extensions>,
     last_resort: bool,
 }
 
@@ -472,7 +472,7 @@ impl KeyPackageBuilder {
     }
 
     /// Set the key package extensions.
-    pub fn key_package_extensions(mut self, extensions: Extensions<Extension>) -> Self {
+    pub fn key_package_extensions(mut self, extensions: Extensions) -> Self {
         self.key_package_extensions.replace(extensions);
         self
     }
@@ -490,7 +490,7 @@ impl KeyPackageBuilder {
     }
 
     /// Set the leaf node extensions.
-    pub fn leaf_node_extensions(mut self, extensions: Extensions<Extension>) -> Self {
+    pub fn leaf_node_extensions(mut self, extensions: Extensions) -> Self {
         self.leaf_node_extensions.replace(extensions);
 
         Ok(self)

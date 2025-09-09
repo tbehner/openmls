@@ -5,7 +5,6 @@ use crate::{
     ciphersuite::{signable::*, *},
     credentials::*,
     extensions::Extensions,
-    prelude::Extension,
     treesync::node::leaf_node::{LeafNodeIn, VerifiableLeafNode},
     versions::ProtocolVersion,
 };
@@ -93,7 +92,7 @@ struct KeyPackageTbsIn {
     ciphersuite: Ciphersuite,
     init_key: InitKey,
     leaf_node: LeafNodeIn,
-    extensions: Extensions<Extension>,
+    extensions: Extensions,
 }
 
 /// The key package struct.

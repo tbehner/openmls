@@ -292,13 +292,20 @@ fn test_valsem242() {
                 group_id: alice_group.group_id().clone(),
                 version: Default::default(),
                 ciphersuite,
-                extensions: alice_group.context().extensions().clone().into(),
+                extensions: alice_group.context().extensions().clone(),
             }))
         };
 
+        let gce = alice_group
+            .context()
+            .extensions()
+            .clone()
+            .try_into()
+            .unwrap();
+
         let gce_proposal = {
             ProposalOrRef::proposal(Proposal::group_context_extensions(
-                GroupContextExtensionProposal::new(alice_group.context().extensions().clone()),
+                GroupContextExtensionProposal::new(gce),
             ))
         };
 

@@ -117,7 +117,7 @@ fn opaque_extension() {
             ])
             .unwrap(),
         )
-        .unwrap()
+        .expect("error creating commit")
         .load_psks(provider.storage())
         .expect("error loading psks")
         .build(
@@ -180,7 +180,7 @@ fn opaque_extension() {
             ])
             .unwrap(),
         )
-        .unwrap()
+        .expect("error creating commit")
         .load_psks(provider.storage())
         .expect("error loading psks")
         .build(
@@ -232,7 +232,7 @@ fn opaque_extension() {
 fn generate_key_package(
     ciphersuite: Ciphersuite,
     credential_with_key: CredentialWithKey,
-    extensions: Extensions<Extension>,
+    extensions: Extensions,
     provider: &impl crate::storage::OpenMlsProvider,
     signer: &impl Signer,
 ) -> KeyPackageBundle {

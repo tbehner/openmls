@@ -1,7 +1,6 @@
 use std::slice::from_ref;
 
 use openmls::{
-    prelude::Extension,
     prelude::{test_utils::new_credential, *},
     storage::OpenMlsProvider,
     treesync::LeafNodeParameters,
@@ -12,7 +11,7 @@ use openmls_traits::signatures::Signer;
 
 fn generate_key_package<Provider: OpenMlsProvider>(
     ciphersuite: Ciphersuite,
-    extensions: Extensions<Extension>,
+    extensions: Extensions,
     provider: &Provider,
     credential_with_key: CredentialWithKey,
     signer: &impl Signer,
@@ -1752,8 +1751,7 @@ fn group_context_extensions_proposal() {
         .unwrap()
         .group_context()
         .clone();
-    let gc_extensions: Extensions<Extension> = group_context_staged.extensions().clone().into();
-    assert_eq!(gc_extensions, new_extensions);
+    assert_eq!(group_context_staged.extensions(), &new_extensions);
 
     alice_group
         .merge_pending_commit(alice_provider)

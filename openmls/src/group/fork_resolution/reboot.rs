@@ -7,14 +7,13 @@ use openmls_traits::signatures::Signer;
 use crate::{
     credentials::CredentialWithKey,
     extensions::errors::InvalidExtensionError,
-    extensions::GroupContextExtension,
     group::{
         commit_builder::{CommitBuilder, CommitMessageBundle, Initial},
         mls_group::builder::MlsGroupBuilder,
         CommitBuilderStageError, CreateCommitError, Extensions, GroupId, Member, MlsGroup,
         NewGroupError,
     },
-    prelude::{Extension, KeyPackage},
+    prelude::KeyPackage,
     storage::OpenMlsProvider,
 };
 
@@ -48,7 +47,7 @@ pub struct RebootBuilder<'a> {
 impl<'a> RebootBuilder<'a> {
     /// Returns the group context extensions of the old group, so they can be updated and passed
     /// into the new group.
-    pub fn old_group_context_extensions(&self) -> &Extensions<GroupContextExtension> {
+    pub fn old_group_context_extensions(&self) -> &Extensions {
         self.group.context().extensions()
     }
 
@@ -75,7 +74,7 @@ impl<'a> RebootBuilder<'a> {
     /// argument. If that is not desired, provide the identity function (`|b| b`).
     pub fn finish<Provider: OpenMlsProvider>(
         self,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
         new_members: Vec<KeyPackage>,
         refine_commit_builder: impl FnMut(CommitBuilder<Initial>) -> CommitBuilder<Initial>,
         provider: &Provider,

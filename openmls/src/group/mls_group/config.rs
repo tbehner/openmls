@@ -94,9 +94,9 @@ pub struct MlsGroupCreateConfig {
     /// Configuration parameters relevant to group operation at runtime
     pub(crate) join_config: MlsGroupJoinConfig,
     /// List of initial group context extensions
-    pub(crate) group_context_extensions: Extensions<GroupContextExtension>,
+    pub(crate) group_context_extensions: Extensions,
     /// List of initial leaf node extensions
-    pub(crate) leaf_node_extensions: Extensions<Extension>,
+    pub(crate) leaf_node_extensions: Extensions,
 }
 
 impl Default for MlsGroupCreateConfig {
@@ -210,7 +210,7 @@ impl MlsGroupCreateConfig {
     /// Returns the [`Extensions`] set as the initial group context.
     /// This does not contain the initial group context extensions
     /// added from builder calls to `external_senders` or `required_capabilities`.
-    pub fn group_context_extensions(&self) -> &Extensions<GroupContextExtension> {
+    pub fn group_context_extensions(&self) -> &Extensions {
         &self.group_context_extensions
     }
 
@@ -325,9 +325,10 @@ impl MlsGroupCreateConfigBuilder {
     /// Sets initial group context extensions.
     pub fn with_group_context_extensions(
         mut self,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
     ) -> Result<Self, InvalidExtensionError> {
-        self.config.group_context_extensions = extensions.try_into()?;
+        ExtensionsForObject::<GroupContext>::validate(extensions.iter())?;
+        self.config.group_context_extensions = extensions;
         Ok(self)
     }
 
@@ -336,7 +337,7 @@ impl MlsGroupCreateConfigBuilder {
     /// Returns an error if the extension types are not valid in a leaf node.
     pub fn with_leaf_node_extensions(
         mut self,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
     ) -> Result<Self, LeafNodeValidationError> {
         // Ensure that these extensions are not invalid for leaf nodes.
         // https://validation.openmls.tech/#valn1601

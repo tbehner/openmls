@@ -8,7 +8,7 @@ use crate::{
     group::{GroupContext, GroupId},
     key_packages::Lifetime,
     messages::ConfirmationTag,
-    prelude::{Extension, GroupContextExtension},
+    prelude::ExtensionsForObject,
     schedule::CommitSecret,
     storage::OpenMlsProvider,
     treesync::{
@@ -25,8 +25,8 @@ pub(crate) struct TempBuilderPG1 {
     credential_with_key: CredentialWithKey,
     lifetime: Option<Lifetime>,
     capabilities: Option<Capabilities>,
-    leaf_node_extensions: Extensions<Extension>,
-    group_context_extensions: Extensions<GroupContextExtension>,
+    leaf_node_extensions: Extensions,
+    group_context_extensions: Extensions,
 }
 
 impl TempBuilderPG1 {
@@ -42,21 +42,29 @@ impl TempBuilderPG1 {
 
     pub(crate) fn with_group_context_extensions(
         mut self,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
     ) -> Result<Self, InvalidExtensionError> {
-        let group_context_extensions: Extensions<GroupContextExtension> = extensions.try_into()?;
-        self.group_context_extensions = group_context_extensions;
+        ExtensionsForObject::<GroupContext>::validate(extensions.iter())?;
+        self.group_context_extensions = extensions;
         Ok(self)
     }
 
     pub(crate) fn with_leaf_node_extensions(
         mut self,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
     ) -> Result<Self, InvalidExtensionError> {
-        // Ensure that these extensions are not invalid for leaf nodes.
-        // https://validation.openmls.tech/#valn1601
-        extensions.validate_extension_types_for_leaf_node()?;
-
+        // None of the default extensions are leaf node extensions, so only
+        // unknown extensions can be leaf node extensions.
+        let invalid_in_leaf_node: Vec<_> = extensions
+            .iter()
+            .filter(|e| !matches!(e.extension_type(), ExtensionType::Unknown(_)))
+            .collect();
+        if !invalid_in_leaf_node.is_empty() {
+            return Err(InvalidExtensionError::ExtensionTypeNotValidInObject {
+                illegal_extension: invalid_in_leaf_node.first().unwrap().extension_type(),
+                ty: std::any::type_name::<Self>(),
+            });
+        }
         self.leaf_node_extensions = extensions;
         Ok(self)
     }

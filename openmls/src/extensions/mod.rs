@@ -24,6 +24,7 @@
 use std::{
     fmt::Debug,
     io::{Read, Write},
+    marker::PhantomData,
 };
 
 use serde::{Deserialize, Serialize};
@@ -54,6 +55,8 @@ use tls_codec::{
     Deserialize as TlsDeserializeTrait, DeserializeBytes, Error, Serialize as TlsSerializeTrait,
     Size, TlsDeserialize, TlsSerialize, TlsSize,
 };
+
+use crate::group::GroupContext;
 
 #[cfg(test)]
 mod tests;
@@ -237,125 +240,85 @@ pub enum Extension {
     Unknown(u16, UnknownExtension),
 }
 
-/// # GroupContextExtension
-///
-/// A group context extension is one of the [`GroupContextExtension`] enum values.
-/// The enum provides a set of common functionality for extensions that are valid in a group
-/// context.
-///
-/// See the individual extensions for more details on each extension.
-///
-/// ```c
-/// // draft-ietf-mls-protocol-16
-/// struct {
-///     ExtensionType extension_type;
-///     opaque extension_data<V>;
-/// } Extension;
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum GroupContextExtension {
-    /// A [`RequiredCapabilitiesExtension`]
-    RequiredCapabilities(RequiredCapabilitiesExtension),
-
-    /// An [`ExternalSendersExtension`]
-    ExternalSenders(ExternalSendersExtension),
-
-    /// A currently unknown extension.
-    Unknown(u16, UnknownExtension),
-}
-
-/// TypedExtension is implemented by all types that can be used as a Extension.
-pub trait TypedExtension:
-    Debug + Clone + PartialEq + Eq + Serialize + Size + TlsDeserializeTrait + TlsSerializeTrait
-{
-    /// Get the type of the extension.
-    fn extension_type(&self) -> ExtensionType;
-}
-
-impl TypedExtension for GroupContextExtension {
-    fn extension_type(&self) -> ExtensionType {
-        match self {
-            GroupContextExtension::RequiredCapabilities(_) => ExtensionType::RequiredCapabilities,
-            GroupContextExtension::ExternalSenders(_) => ExtensionType::ExternalSenders,
-            GroupContextExtension::Unknown(kind, _) => ExtensionType::Unknown(*kind),
-        }
-    }
-}
-
-impl TypedExtension for Extension {
-    fn extension_type(&self) -> ExtensionType {
-        match self {
-            Extension::ApplicationId(_) => ExtensionType::ApplicationId,
-            Extension::RatchetTree(_) => ExtensionType::RatchetTree,
-            Extension::RequiredCapabilities(_) => ExtensionType::RequiredCapabilities,
-            Extension::ExternalPub(_) => ExtensionType::ExternalPub,
-            Extension::ExternalSenders(_) => ExtensionType::ExternalSenders,
-            Extension::LastResort(_) => ExtensionType::LastResort,
-            Extension::Unknown(kind, _) => ExtensionType::Unknown(*kind),
-        }
-    }
-}
-
 /// A unknown/unparsed extension represented by raw bytes.
 #[derive(
     PartialEq, Eq, Clone, Debug, Serialize, Deserialize, TlsSize, TlsSerialize, TlsDeserialize,
 )]
 pub struct UnknownExtension(pub Vec<u8>);
 
-/// A list of extensions with unique extension types.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TlsSize)]
-pub struct Extensions<T>
-where
-    T: TypedExtension,
-{
-    unique: Vec<T>,
+/// A Extension for Object of type T
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtensionsForObject<T> {
+    unique: Vec<Extension>,
+    #[serde(skip)]
+    _object: core::marker::PhantomData<T>,
 }
 
-impl<T: TypedExtension> Default for Extensions<T> {
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, TlsSize, TlsSerialize, TlsDeserialize)]
+/// Any object
+pub struct AnyObject;
+
+/// Type alias for AnyObject extensions
+pub type Extensions = ExtensionsForObject<AnyObject>;
+
+impl<T> Default for ExtensionsForObject<T> {
     fn default() -> Self {
-        Self { unique: vec![] }
+        Self {
+            unique: vec![],
+            _object: PhantomData,
+        }
     }
 }
 
-impl<T: TypedExtension> TlsSerializeTrait for Extensions<T> {
+impl<T> Size for ExtensionsForObject<T> {
+    fn tls_serialized_len(&self) -> usize {
+        Vec::tls_serialized_len(&self.unique)
+    }
+}
+
+impl<T> TlsSerializeTrait for ExtensionsForObject<T> {
     fn tls_serialize<W: Write>(&self, writer: &mut W) -> Result<usize, Error> {
         self.unique.tls_serialize(writer)
     }
 }
 
-impl<T: TypedExtension> TlsDeserializeTrait for Extensions<T> {
+impl<T: ExtensionValidator> TlsDeserializeTrait for ExtensionsForObject<T> {
     fn tls_deserialize<R: Read>(bytes: &mut R) -> Result<Self, Error>
     where
         Self: Sized,
     {
-        let candidate: Vec<T> = Vec::tls_deserialize(bytes)?;
-        Extensions::try_from(candidate)
+        let candidate: Vec<Extension> = Vec::tls_deserialize(bytes)?;
+        ExtensionsForObject::<T>::try_from(candidate)
             .map_err(|_| Error::DecodingError("Found duplicate extensions".into()))
     }
 }
 
-impl<T: TypedExtension> DeserializeBytes for Extensions<T> {
+impl<T: ExtensionValidator> DeserializeBytes for ExtensionsForObject<T> {
     fn tls_deserialize_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error>
     where
         Self: Sized,
     {
         let mut bytes_ref = bytes;
-        let extensions = Extensions::tls_deserialize(&mut bytes_ref)?;
+        let extensions = ExtensionsForObject::<T>::tls_deserialize(&mut bytes_ref)?;
         let remainder = &bytes[extensions.tls_serialized_len()..];
         Ok((extensions, remainder))
     }
 }
 
-impl<T: TypedExtension> Extensions<T> {
+impl<T: ExtensionValidator> ExtensionsForObject<T> {
     /// Create an empty extension list.
     pub fn empty() -> Self {
-        Self { unique: vec![] }
+        Self {
+            unique: vec![],
+            _object: PhantomData,
+        }
     }
 
     /// Create an extension list with a single extension.
-    pub fn single(extension: T) -> Self {
+    pub fn single(extension: Extension) -> Self {
         Self {
             unique: vec![extension],
+            _object: PhantomData,
         }
     }
 
@@ -363,12 +326,27 @@ impl<T: TypedExtension> Extensions<T> {
     ///
     /// This function will fail when the list of extensions contains duplicate
     /// extension types.
-    pub fn from_vec(extensions: Vec<T>) -> Result<Self, InvalidExtensionError> {
+    pub fn from_vec(extensions: Vec<Extension>) -> Result<Self, InvalidExtensionError> {
         extensions.try_into()
     }
 
+    /// Validate if the extensions are valid for this context
+    pub fn validate<'a>(
+        extensions: impl Iterator<Item = &'a Extension>,
+    ) -> Result<(), InvalidExtensionError> {
+        for ext in extensions {
+            if !T::valid_extension_type(ext) {
+                return Err(InvalidExtensionError::ExtensionTypeNotValidInObject {
+                    illegal_extension: ext.extension_type(),
+                    ty: std::any::type_name::<T>(),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Returns an iterator over the extension list.
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
+    pub fn iter(&self) -> impl Iterator<Item = &Extension> {
         self.unique.iter()
     }
 
@@ -376,7 +354,7 @@ impl<T: TypedExtension> Extensions<T> {
     ///
     /// Returns an error when there already is an extension with the same
     /// extension type.
-    pub fn add(&mut self, extension: T) -> Result<(), InvalidExtensionError> {
+    pub fn add(&mut self, extension: Extension) -> Result<(), InvalidExtensionError> {
         if self.contains(extension.extension_type()) {
             return Err(InvalidExtensionError::Duplicate);
         }
@@ -389,7 +367,7 @@ impl<T: TypedExtension> Extensions<T> {
     /// Add an extension to the extension list (or replace an existing one.)
     ///
     /// Returns the replaced extension (if any).
-    pub fn add_or_replace(&mut self, extension: T) -> Option<T> {
+    pub fn add_or_replace(&mut self, extension: Extension) -> Option<Extension> {
         let replaced = self.remove(extension.extension_type());
         self.unique.push(extension);
         replaced
@@ -399,7 +377,7 @@ impl<T: TypedExtension> Extensions<T> {
     ///
     /// Returns the removed extension or `None` when there is no extension with
     /// the given extension type.
-    pub fn remove(&mut self, extension_type: ExtensionType) -> Option<T> {
+    pub fn remove(&mut self, extension_type: ExtensionType) -> Option<Extension> {
         if let Some(pos) = self
             .unique
             .iter()
@@ -427,20 +405,51 @@ impl<T: TypedExtension> Extensions<T> {
         for extension_type in self.unique.iter().map(Extension::extension_type) {
             // also allow unknown extensions, which return `None` here
             if extension_type.is_valid_in_leaf_node() == Some(false) {
-                return Err(InvalidExtensionError::IllegalInLeafNodes);
+                return Err(InvalidExtensionError::ExtensionTypeNotValidInObject {
+                    illegal_extension: extension_type,
+                    ty: std::any::type_name::<LeafNode>(),
+                });
             }
         }
         Ok(())
     }
 }
 
-impl<T: TypedExtension> TryFrom<Vec<T>> for Extensions<T> {
+/// Can be implemented by a type to validate extensions.
+pub trait ExtensionValidator {
+    /// Check if the extension is valid.
+    fn valid_extension_type(ext: &Extension) -> bool;
+}
+
+impl ExtensionValidator for AnyObject {
+    fn valid_extension_type(_ext: &Extension) -> bool {
+        true
+    }
+}
+
+impl ExtensionValidator for GroupContext {
+    fn valid_extension_type(ext: &Extension) -> bool {
+        matches!(
+            ext.extension_type(),
+            ExtensionType::RequiredCapabilities
+                | ExtensionType::ExternalSenders
+                | ExtensionType::Unknown(_)
+        )
+    }
+}
+
+impl<T: ExtensionValidator> TryFrom<Vec<Extension>> for ExtensionsForObject<T> {
     type Error = InvalidExtensionError;
 
-    fn try_from(candidate: Vec<T>) -> Result<Self, Self::Error> {
-        let mut unique: Vec<T> = Vec::new();
-
+    fn try_from(candidate: Vec<Extension>) -> Result<Self, Self::Error> {
+        let mut unique: Vec<Extension> = Vec::new();
         for extension in candidate.into_iter() {
+            if !T::valid_extension_type(&extension) {
+                return Err(InvalidExtensionError::ExtensionTypeNotValidInObject {
+                    illegal_extension: extension.extension_type(),
+                    ty: std::any::type_name::<T>(),
+                });
+            }
             if unique
                 .iter()
                 .any(|ext| ext.extension_type() == extension.extension_type())
@@ -451,53 +460,20 @@ impl<T: TypedExtension> TryFrom<Vec<T>> for Extensions<T> {
             }
         }
 
-        Ok(Self { unique })
+        Ok(Self {
+            unique,
+            _object: PhantomData,
+        })
     }
 }
 
-impl<T: TypedExtension> Extensions<T> {
-    fn find_by_type(&self, extension_type: ExtensionType) -> Option<&T> {
+impl<T> ExtensionsForObject<T> {
+    fn find_by_type(&self, extension_type: ExtensionType) -> Option<&Extension> {
         self.unique
             .iter()
             .find(|ext| ext.extension_type() == extension_type)
     }
-}
 
-impl Extensions<GroupContextExtension> {
-    /// Get a reference to the [`RequiredCapabilitiesExtension`] if there is
-    /// any.
-    pub fn required_capabilities(&self) -> Option<&RequiredCapabilitiesExtension> {
-        self.find_by_type(ExtensionType::RequiredCapabilities)
-            .and_then(|e| match e {
-                GroupContextExtension::RequiredCapabilities(e) => Some(e),
-                _ => None,
-            })
-    }
-
-    /// Get a reference to the [`ExternalSendersExtension`] if there is any.
-    pub fn external_senders(&self) -> Option<&ExternalSendersExtension> {
-        self.find_by_type(ExtensionType::ExternalSenders)
-            .and_then(|e| match e {
-                GroupContextExtension::ExternalSenders(e) => Some(e),
-                _ => None,
-            })
-    }
-
-    /// Get a reference to the [`UnknownExtension`] with the given type id, if there is any.
-    pub fn unknown(&self, extension_type_id: u16) -> Option<&UnknownExtension> {
-        let extension_type: ExtensionType = extension_type_id.into();
-
-        match extension_type {
-            ExtensionType::Unknown(_) => self.find_by_type(extension_type).and_then(|e| match e {
-                GroupContextExtension::Unknown(_, e) => Some(e),
-                _ => None,
-            }),
-            _ => None,
-        }
-    }
-}
-
-impl Extensions<Extension> {
     /// Get a reference to the [`ApplicationIdExtension`] if there is any.
     pub fn application_id(&self) -> Option<&ApplicationIdExtension> {
         self.find_by_type(ExtensionType::ApplicationId)
@@ -638,84 +614,29 @@ impl Extension {
     }
 }
 
-impl GroupContextExtension {
-    /// Get a reference to this extension as [`RequiredCapabilitiesExtension`].
-    /// Returns an [`ExtensionError::InvalidExtensionType`] error if called on
-    /// an [`Extension`] that's not a [`RequiredCapabilitiesExtension`].
-    pub fn as_required_capabilities_extension(
-        &self,
-    ) -> Result<&RequiredCapabilitiesExtension, ExtensionError> {
-        match self {
-            Self::RequiredCapabilities(e) => Ok(e),
-            _ => Err(ExtensionError::InvalidExtensionType(
-                "This is not a RequiredCapabilitiesExtension".into(),
-            )),
-        }
-    }
-
-    /// Get a reference to this extension as [`ExternalSendersExtension`].
-    /// Returns an [`ExtensionError::InvalidExtensionType`] error if called on
-    /// an [`Extension`] that's not a [`ExternalSendersExtension`].
-    pub fn as_external_senders_extension(
-        &self,
-    ) -> Result<&ExternalSendersExtension, ExtensionError> {
-        match self {
-            Self::ExternalSenders(e) => Ok(e),
-            _ => Err(ExtensionError::InvalidExtensionType(
-                "This is not an ExternalSendersExtension".into(),
-            )),
-        }
-    }
-
-    /// Returns the [`ExtensionType`]
-    #[inline]
-    pub const fn extension_type(&self) -> ExtensionType {
-        match self {
-            GroupContextExtension::RequiredCapabilities(_) => ExtensionType::RequiredCapabilities,
-            GroupContextExtension::ExternalSenders(_) => ExtensionType::ExternalSenders,
-            GroupContextExtension::Unknown(kind, _) => ExtensionType::Unknown(*kind),
-        }
-    }
-}
-
-impl TryFrom<Extension> for GroupContextExtension {
+impl TryFrom<Extensions> for ExtensionsForObject<GroupContext> {
     type Error = InvalidExtensionError;
 
-    fn try_from(value: Extension) -> Result<Self, Self::Error> {
-        match value {
-            Extension::RequiredCapabilities(e) => {
-                Ok(GroupContextExtension::RequiredCapabilities(e))
-            }
-            Extension::ExternalSenders(e) => Ok(GroupContextExtension::ExternalSenders(e)),
-            Extension::Unknown(k, e) => Ok(GroupContextExtension::Unknown(k, e)),
-            _ => Err(InvalidExtensionError::IllegalInGroupContext),
+    fn try_from(value: Extensions) -> Result<Self, Self::Error> {
+        value.unique.try_into()
+    }
+}
+
+impl From<ExtensionsForObject<GroupContext>> for Extensions {
+    fn from(value: ExtensionsForObject<GroupContext>) -> Self {
+        Extensions {
+            unique: value.unique,
+            _object: PhantomData,
         }
     }
 }
 
-impl From<GroupContextExtension> for Extension {
-    fn from(value: GroupContextExtension) -> Self {
-        match value {
-            GroupContextExtension::RequiredCapabilities(e) => Extension::RequiredCapabilities(e),
-            GroupContextExtension::ExternalSenders(e) => Extension::ExternalSenders(e),
-            GroupContextExtension::Unknown(t, e) => Extension::Unknown(t, e),
+impl From<&ExtensionsForObject<GroupContext>> for Extensions {
+    fn from(value: &ExtensionsForObject<GroupContext>) -> Self {
+        Self {
+            unique: value.unique.clone(),
+            _object: PhantomData,
         }
-    }
-}
-
-impl TryFrom<Extensions<Extension>> for Extensions<GroupContextExtension> {
-    type Error = InvalidExtensionError;
-
-    fn try_from(value: Extensions<Extension>) -> Result<Self, Self::Error> {
-        let group_extensions: Result<Vec<GroupContextExtension>, Self::Error> =
-            value.iter().map(|e| e.clone().try_into()).collect();
-        group_extensions.and_then(Extensions::from_vec)
-    }
-}
-
-impl From<Extensions<GroupContextExtension>> for Extensions<Extension> {
-    fn from(value: Extensions<GroupContextExtension>) -> Self {
-        Extensions::from_vec(value.iter().map(|e| e.clone().into()).collect()).unwrap()
     }
 }
 
@@ -809,7 +730,7 @@ mod test {
             .permutations(3)
             .collect::<Vec<_>>()
         {
-            let candidate: Extensions<Extension> = Extensions::try_from(candidate).unwrap();
+            let candidate: Extensions = Extensions::try_from(candidate).unwrap();
             let bytes = candidate.tls_serialize_detached().unwrap();
             let got = Extensions::tls_deserialize(&mut bytes.as_slice()).unwrap();
             assert_eq!(candidate, got);

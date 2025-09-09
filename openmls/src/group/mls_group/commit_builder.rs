@@ -247,10 +247,10 @@ impl<'a> CommitBuilder<'a, Initial, &mut MlsGroup> {
     /// proposals to be committed.
     pub fn propose_group_context_extensions(
         mut self,
-        extensions: Extensions<Extension>,
+        extensions: Extensions,
     ) -> Result<Self, CreateCommitError> {
-        let group_extensions = extensions.try_into()?;
-        let proposal = GroupContextExtensionProposal::new(group_extensions);
+        let group_extensions = extensions;
+        let proposal = GroupContextExtensionProposal::new(group_extensions.try_into()?);
         self.stage
             .own_proposals
             .push(Proposal::group_context_extensions(proposal));
@@ -641,10 +641,7 @@ impl<'a, G: BorrowMut<MlsGroup>> CommitBuilder<'a, LoadedPsks, G> {
             (None, None)
         } else {
             // Create the ratchet tree extension if necessary
-            let extensions: Extensions<Extension> = if group
-                .configuration()
-                .use_ratchet_tree_extension
-            {
+            let extensions: Extensions = if group.configuration().use_ratchet_tree_extension {
                 Extensions::from_vec(vec![
                     Extension::RatchetTree(RatchetTreeExtension::new(diff.export_ratchet_tree())),
                     external_pub_extension,

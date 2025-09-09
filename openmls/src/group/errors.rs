@@ -432,7 +432,7 @@ pub enum ValidationError {
     ExternalCommitValidation(#[from] ExternalCommitValidationError),
     /// See [`InvalidExtensionError`]
     #[error("Invalid extension")]
-    InvalidExtension,
+    InvalidExtension(#[from] InvalidExtensionError),
 }
 
 /// Proposal validation error
@@ -591,6 +591,9 @@ pub enum CreateGroupContextExtProposalError<StorageError> {
     /// Error writing updated group to storage.
     #[error("Error writing updated group data to storage.")]
     StorageError(StorageError),
+    /// Error validating the extensions
+    #[error(transparent)]
+    InvalidExtensionError(#[from] InvalidExtensionError),
 }
 
 /// Error merging a commit.
