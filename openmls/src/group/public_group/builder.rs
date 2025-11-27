@@ -4,15 +4,17 @@ use super::{errors::PublicGroupBuildError, PublicGroup};
 use crate::{
     credentials::CredentialWithKey,
     error::LibraryError,
-    extensions::{errors::InvalidExtensionError, Extensions},
+    extensions::Extensions,
     group::{GroupContext, GroupId},
     key_packages::Lifetime,
     messages::ConfirmationTag,
-    prelude::ExtensionsForObject,
     schedule::CommitSecret,
     storage::OpenMlsProvider,
     treesync::{
-        node::{encryption_keys::EncryptionKeyPair, leaf_node::Capabilities},
+        node::{
+            encryption_keys::EncryptionKeyPair,
+            leaf_node::{Capabilities, LeafNode},
+        },
         TreeSync,
     },
     versions::ProtocolVersion,
@@ -25,8 +27,8 @@ pub(crate) struct TempBuilderPG1 {
     credential_with_key: CredentialWithKey,
     lifetime: Option<Lifetime>,
     capabilities: Option<Capabilities>,
-    leaf_node_extensions: Extensions,
-    group_context_extensions: Extensions,
+    leaf_node_extensions: Extensions<LeafNode>,
+    group_context_extensions: Extensions<GroupContext>,
 }
 
 impl TempBuilderPG1 {
@@ -42,31 +44,15 @@ impl TempBuilderPG1 {
 
     pub(crate) fn with_group_context_extensions(
         mut self,
-        extensions: Extensions,
-    ) -> Result<Self, InvalidExtensionError> {
-        ExtensionsForObject::<GroupContext>::validate(extensions.iter())?;
+        extensions: Extensions<GroupContext>,
+    ) -> Self {
         self.group_context_extensions = extensions;
-        Ok(self)
+        self
     }
 
-    pub(crate) fn with_leaf_node_extensions(
-        mut self,
-        extensions: Extensions,
-    ) -> Result<Self, InvalidExtensionError> {
-        // None of the default extensions are leaf node extensions, so only
-        // unknown extensions can be leaf node extensions.
-        let invalid_in_leaf_node: Vec<_> = extensions
-            .iter()
-            .filter(|e| !matches!(e.extension_type(), ExtensionType::Unknown(_)))
-            .collect();
-        if !invalid_in_leaf_node.is_empty() {
-            return Err(InvalidExtensionError::ExtensionTypeNotValidInObject {
-                illegal_extension: invalid_in_leaf_node.first().unwrap().extension_type(),
-                ty: std::any::type_name::<Self>(),
-            });
-        }
+    pub(crate) fn with_leaf_node_extensions(mut self, extensions: Extensions<LeafNode>) -> Self {
         self.leaf_node_extensions = extensions;
-        Ok(self)
+        self
     }
 
     pub(crate) fn get_secrets(
