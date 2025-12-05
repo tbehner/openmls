@@ -6,7 +6,7 @@ members = [
     "libcrux_crypto",
     "fuzz",
     "cli",
-    "interop_client",
+    # "interop_client",
     "memory_storage",
     "sqlite_storage",
     "sqlx_storage",
@@ -17,6 +17,13 @@ members = [
     "openmls_test",
 ]
 resolver = "2"
+
+[workspace.metadata.crane]
+name = "openmls"
+
+[workspace.package]
+name = "openmls"
+version = "0.7.1"
 
 # Central dependency management for some crates
 [workspace.dependencies]
@@ -33,3 +40,8 @@ openmls_libcrux_crypto = { version = "0.2.1", path = "libcrux_crypto" }
 
 openmls_memory_storage = { version = "0.4.1", path = "memory_storage" }
 openmls_sqlite_storage = { version = "0.1.1", path = "sqlite_storage" }
+
+
+hpke-rs = { version = "0.4.0", features = [ "hazmat", "serialization",], git = "https://github.com/cryspen/hpke-rs" }
+hpke-rs-crypto = { version = "0.3.0", git = "https://github.com/cryspen/hpke-rs" }
+hpke-rs-libcrux = { version = "0.4.0", git = "https://github.com/cryspen/hpke-rs" }
