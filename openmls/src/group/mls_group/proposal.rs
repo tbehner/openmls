@@ -9,7 +9,7 @@ use crate::{
     binary_tree::LeafNodeIndex,
     ciphersuite::hash_ref::ProposalRef,
     credentials::Credential,
-    extensions::{AnyObject, Extensions},
+    extensions::Extensions,
     framing::{mls_auth_content::AuthenticatedContent, MlsMessageOut},
     group::{errors::CreateAddProposalError, GroupContext, GroupId, ValidationError},
     key_packages::KeyPackage,
@@ -44,14 +44,14 @@ pub enum Propose {
         group_id: GroupId,
         version: ProtocolVersion,
         ciphersuite: Ciphersuite,
-        extensions: Extensions<AnyObject>,
+        extensions: Extensions<GroupContext>,
     },
 
     /// An external init proposal gets the raw bytes from the KEM output.
     ExternalInit(Vec<u8>),
 
     /// Propose adding new group context extensions.
-    GroupContextExtensions(Extensions<AnyObject>),
+    GroupContextExtensions(Extensions<GroupContext>),
 
     /// A custom proposal with semantics to be implemented by the application.
     Custom(CustomProposal),
