@@ -59,10 +59,6 @@ pub enum ProposalIn {
     ReInit(Box<ReInitProposal>),
     ExternalInit(Box<ExternalInitProposal>),
     GroupContextExtensions(Box<GroupContextExtensionProposalIn>),
-    // # Extensions
-    // TODO(#916): `AppAck` is not in draft-ietf-mls-protocol-17 but
-    //             was moved to `draft-ietf-mls-extensions-00`.
-    AppAck(Box<AppAckProposal>),
     // A SelfRemove proposal is an empty struct.
     SelfRemove,
     #[cfg(feature = "extensions-draft-08")]

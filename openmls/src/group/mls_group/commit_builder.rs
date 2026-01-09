@@ -641,13 +641,11 @@ impl<'a, G: BorrowMut<MlsGroup>> CommitBuilder<'a, LoadedPsks, G> {
             (None, None)
         } else {
             // Create the ratchet tree extension if necessary
-            let extensions: Extensions = if group.configuration().use_ratchet_tree_extension {
-                Extensions::from_vec(vec![
-                    Extension::RatchetTree(RatchetTreeExtension::new(diff.export_ratchet_tree())),
-                    external_pub_extension,
-                ])?
-            } else {
-                Extensions::single(external_pub_extension)
+            let mut extensions = Extensions::empty();
+            if group.configuration().use_ratchet_tree_extension {
+                extensions.add(Extension::RatchetTree(RatchetTreeExtension::new(
+                    diff.export_ratchet_tree(),
+                )))?;
             };
 
             let welcome_option = needs_welcome

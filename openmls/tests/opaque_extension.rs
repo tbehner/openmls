@@ -117,7 +117,7 @@ fn opaque_extension() {
             .unwrap(),
         )
         .expect("error creating commit")
-        .load_psks(provider.storage())
+        .load_psks(alice_provider.storage())
         .expect("error loading psks")
         .build(
             alice_provider.rand(),
@@ -180,7 +180,7 @@ fn opaque_extension() {
             .unwrap(),
         )
         .expect("error creating commit")
-        .load_psks(provider.storage())
+        .load_psks(alice_provider.storage())
         .expect("error loading psks")
         .build(
             alice_provider.rand(),

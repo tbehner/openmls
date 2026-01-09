@@ -633,6 +633,7 @@ impl GroupContextExtensionProposal {
         &self.extensions
     }
 
+    /// Consumes the proposal and returns the contained extensions.
     pub fn into_extensions(self) -> Extensions<GroupContext> {
         self.extensions
     }

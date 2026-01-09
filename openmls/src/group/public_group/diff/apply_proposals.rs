@@ -168,8 +168,7 @@ impl PublicGroupDiff<'_> {
                     Some(extensions.extensions().clone())
                 }
                 _ => None,
-            })
-            .map(|extensions| extensions.into());
+            });
 
         let proposals_require_path = proposal_queue
             .queued_proposals()
